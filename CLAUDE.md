@@ -46,7 +46,7 @@ holds **no merge/deploy authority and no platform master key**.
 Valid iff both signatures verify, in window, not revoked, and `finding_cid`
 resolves to an active akuma finding on the same owner+target.
 
-## Cells (7; R0 path-reserved under `40-engine/kotoba/crates/kotoba-kotodama/cells/tsukuroi_*/`)
+## Cells (7; R0 path-reserved under `kotoba-lang/kotodama-cells/tsukuroi_*/`)
 
 | Cell | Purpose | Key gate |
 |---|---|---|

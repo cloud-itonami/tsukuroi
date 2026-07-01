@@ -169,7 +169,7 @@
     {
       "phase": "R0",
       "date": "2026-05-29",
-      "scope": "Scaffold only. 7 cells path-reserved under 40-engine/kotoba/crates/kotoba-kotodama/cells/tsukuroi_*/ (import-time RuntimeError). 5 Lexicon schema skeletons under 00-contracts/lexicons/com/etzhayyim/tsukuroi/. manifest + CLAUDE.md. deps.toml [[adrs]] + [[modules]] registration.",
+      "scope": "Scaffold only. 7 cells path-reserved under kotoba-lang/kotodama-cells/tsukuroi_*/ (import-time RuntimeError). 5 Lexicon schema skeletons under 00-contracts/lexicons/com/etzhayyim/tsukuroi/. manifest + CLAUDE.md. deps.toml [[adrs]] + [[modules]] registration.",
       "murakumoFleet": "No deployment",
       "gate": "ADR-2605291500 (PROPOSED)"
     },
