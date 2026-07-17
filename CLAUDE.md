@@ -1,4 +1,4 @@
-# 20-actors/tsukuroi — CLAUDE.md
+# orgs/etzhayyim/com-etzhayyim-tsukuroi — CLAUDE.md
 
 ## Identity
 

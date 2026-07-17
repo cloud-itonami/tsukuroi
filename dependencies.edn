@@ -1,0 +1,13 @@
+{:dependencies
+ [{:dependency/id etzhayyim/root
+   :dependency/repository "https://github.com/etzhayyim/root"
+   :dependency/revision "4c7bf05f104a09d81a13bed8b7d488726497eb10"
+   :dependency/purpose #{:adr :governance}}
+  {:dependency/id com.etzhayyim/akuma
+   :dependency/repository "https://github.com/etzhayyim/com-etzhayyim-akuma"
+   :dependency/revision "b9daf7cbe828689f13bfaaa66d54a56c288189a5"
+   :dependency/purpose #{:finding-source :closure-reprobe}}
+  {:dependency/id com.etzhayyim/chigiri
+   :dependency/repository "https://github.com/etzhayyim/com-etzhayyim-chigiri"
+   :dependency/revision "e08560129675106e0bb4b70e23769ff07a711ce7"
+   :dependency/purpose #{:dispute-mediation}}]}

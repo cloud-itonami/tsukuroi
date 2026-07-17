@@ -1,0 +1,5 @@
+{:identity/id "did:web:tsukuroi.etzhayyim.com"
+ :identity/actor "tsukuroi"
+ :identity/canonical-document "manifest.edn"
+ :identity/external-did-document ".well-known/did.json"
+ :identity/canonical-format :edn}

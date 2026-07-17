@@ -1,12 +1,12 @@
 (ns tsukuroi.methods.test-charter-gates
-  "tsukuroi 繕い — constitutional-gate conformance tests (manifest + central lexicons).
+  "tsukuroi 繕い — constitutional-gate conformance tests (manifest + repository-local canonical lexicons).
 
   Substrate-native Clojure (clj + datomic first tier). tsukuroi is the authorized
   vulnerability-REMEDIATION patch-proposer (the defensive counterpart of akuma's probing): it
   PROPOSES defensive patches via fork-and-PR under a dual-signed mandate, and a HUMAN owner
   merges — it never probes, never exploits, never auto-merges, never holds a platform key. Its
   13 gates are declared in the manifest `constitutionalGates` and encoded as const fields across
-  the 5 central AT-Proto lexicons at 00-contracts/lexicons/com/etzhayyim/tsukuroi/. This suite
+  the 5 repository-local canonical EDN lexicons under lex/. This suite
   pins them so a future R-phase cell wave cannot silently drift them:
 
     G3  NO PROBING — vulnerability input ONLY via an akuma findingCid
@@ -22,22 +22,22 @@
         sandboxNamespace const tsukuroi-validate)
     G11 closure requires owner human merge AND akuma re-probe pass
 
-  Reads central lexicons via cheshire (string keys). It weakens no gate; it asserts them.
+  Reads repository-local canonical EDN lexicons (string keys). It weakens no gate; it asserts them.
   G8 IS the substrate-wide no-server-key invariant for this actor; G10 pins Murakumo-only."
   (:require [clojure.test :refer [deftest is run-tests]]
-            [cheshire.core :as json]))
+            [clojure.edn :as edn]))
 
 #?(:clj
    (do
      (def ^:private here (.getParentFile (java.io.File. ^String *file*)))      ;; methods/
-     (def ^:private actor-dir (.getParentFile here))                          ;; tsukuroi/
-     (def ^:private root (.getParentFile (.getParentFile actor-dir)))          ;; repo root
+     (def ^:private test-dir (.getParentFile here))
+     (def ^:private root (.getParentFile (.getParentFile test-dir)))
      (def ^:private lexdir
-       (java.io.File. root "00-contracts/lexicons/com/etzhayyim/tsukuroi"))
+       (java.io.File. root "lex"))
      (defn- lex [name]
-       (json/parse-string (slurp (java.io.File. lexdir (str name ".json")))))
+       (edn/read-string (slurp (java.io.File. lexdir (str name ".edn")))))
      (defn- manifest []
-       (json/parse-string (slurp (java.io.File. actor-dir "manifest.jsonld"))))))
+       (:actor/manifest (edn/read-string (slurp (java.io.File. root "manifest.edn")))))))
 
 (defn- record-node [doc]
   (let [main (get-in doc ["defs" "main"])]
