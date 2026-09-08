@@ -1,7 +1,7 @@
 (ns tsukuroi.methods.test-manifest-invariants
   "tsukuroi — manifest invariants (ported; reads manifest.edn blob, jsonld retired)."
   (:require [clojure.test :refer [deftest is run-tests]]
-            [clojure.string :as str] [clojure.edn :as edn]))
+            [kotoba.lang.text :as str] [clojure.edn :as edn]))
 (def ^:private here (.getParentFile (java.io.File. ^String *file*)))
 (def ^:private test-dir (.getParentFile here))
 (def ^:private root (.. test-dir getParentFile getParentFile))
