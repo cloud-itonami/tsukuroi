@@ -1,19 +1,90 @@
-;; The test namespaces locate this repository from *file*, walking up from their
-;; own path, so they must be LOADED BY PATH. Under `require` the classpath makes
-;; *file* relative, two parents up is "" and its parent is null, and the
-;; namespace dies at load with "Cannot invoke Object.getClass() because target is
-;; null". This runner used require, so the suite could not run at all.
-(require '[clojure.test :as t])
+;; This suite has been broken twice by the same shape: something outside the
+;; test files decides which files are read and how, and it drifts away from
+;; what is on disk.
+;;
+;;   1. The runner used `require`. The test namespaces locate this repository by
+;;      walking up from *file*, and under `require` the classpath makes *file*
+;;      relative, two parents up is "" and its parent is null, so every
+;;      namespace died at load. Fixed by loading BY PATH.
+;;   2. On 2026-09-10 a rename moved all six sources to .kotoba. The paths were
+;;      written out as a literal list, which the rename did not touch, so
+;;      load-file died on the first name with FileNotFoundException and not one
+;;      test ran. The same rename ALSO took reader conditionals away: Clojure's
+;;      load-file enables them from the file NAME (Compiler.readerOpts allows
+;;      them only for ".cljc"), so #?(:clj ...) inside a .kotoba file is a hard
+;;      "Conditional read not allowed" even once the path is right.
+;;
+;; Hence both halves live here. The plan is DISCOVERED -- every source file
+;; under test/ is a test file, its namespace is read from its own ns form, and
+;; there is no second list to drift. And reading is done here with
+;; :read-cond :allow, so the suite no longer depends on what the files are
+;; called. `--print-plan` prints that plan and runs nothing, which is how
+;; runner_test.kotoba measures what this runner would load.
 
-(def ^:private test-files
-  ["test/tsukuroi/methods/test_charter_gates.cljc"
-   "test/tsukuroi/methods/test_manifest_invariants.cljc"
-   "test/tsukuroi/repository_contract_test.clj"])
+(require '[clojure.test :as t]
+         '[clojure.java.io :as io]
+         '[clojure.string :as str])
 
-(doseq [f test-files] (load-file f))
+(import '[java.io File]
+        '[clojure.lang LineNumberingPushbackReader])
 
-(let [result (apply t/run-tests
-                    '[tsukuroi.methods.test-charter-gates
-                      tsukuroi.methods.test-manifest-invariants
-                      tsukuroi.repository-contract-test])]
-  (System/exit (if (zero? (+ (:fail result) (:error result))) 0 1)))
+(def ^:private source-suffixes [".kotoba" ".cljc" ".clj" ".cljs"])
+
+(defn- source-file? [^File f]
+  (and (.isFile f)
+       (some #(str/ends-with? (.getName f) %) source-suffixes)))
+
+(defn- test-files
+  "Every source file under test/, sorted by path. Discovered, never listed."
+  []
+  (->> (file-seq (io/file "test"))
+       (filter source-file?)
+       (sort-by #(.getPath ^File %))))
+
+(defn- declared-ns
+  "The namespace symbol from the file's own ns form. One form is read, so a
+   reader conditional deeper in the file is not reached here."
+  [^File f]
+  (with-open [r (LineNumberingPushbackReader. (io/reader f))]
+    (let [form (read {:read-cond :allow} r)]
+      (when-not (and (seq? form) (= 'ns (first form)) (symbol? (second form)))
+        (throw (ex-info (str "test file does not open with an ns form: " (.getPath f))
+                        {:path (.getPath f) :form-head (when (seq? form) (first form))})))
+      (second form))))
+
+(defn- load-source
+  "What load-file does, minus the part that reads the extension: read and eval
+   every form with reader conditionals allowed, with *file* bound to the
+   ABSOLUTE path -- the test namespaces walk three parents up from it, which
+   yields null for a relative path."
+  [^File f]
+  (let [abs (.getAbsolutePath f)]
+    (with-open [r (LineNumberingPushbackReader. (io/reader f))]
+      (binding [*ns* *ns*
+                *file* abs
+                ;; the name the compiler stamps into bytecode, which is where
+                ;; clojure.test reads the file of a failing assertion from
+                *source-path* (.getName f)]
+        (loop []
+          (let [form (read {:read-cond :allow :eof ::eof} r)]
+            (when-not (identical? ::eof form)
+              (eval form)
+              (recur))))))))
+
+(let [files  (test-files)
+      plan   (mapv (fn [f] [(.getPath ^File f) (declared-ns f)]) files)
+      ;; A discovering runner that discovers nothing looks exactly like a
+      ;; passing run: zero tests, zero failures, exit 0. Refuse instead.
+      _      (when (empty? plan)
+               (binding [*out* *err*]
+                 (println "run_tests: found no test files under test/ — refusing to report a pass"))
+               (System/exit 2))
+      print? (contains? (set *command-line-args*) "--print-plan")]
+  (if print?
+    (do (doseq [[path ns-sym] plan] (println path ns-sym))
+        (println "PLANNED" (count plan))
+        (System/exit 0))
+    (do
+      (doseq [f files] (load-source f))
+      (let [result (apply t/run-tests (map second plan))]
+        (System/exit (if (zero? (+ (:fail result) (:error result))) 0 1))))))
