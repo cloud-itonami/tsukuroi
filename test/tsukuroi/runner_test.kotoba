@@ -1,0 +1,119 @@
+(ns tsukuroi.runner-test
+  "What run_tests.kotoba would load, against what is on disk.
+
+  This suite has been dead twice, and both times the runner was the thing that
+  was wrong while every test file was fine.
+
+    1. The runner used `require`, so the namespaces -- which find this
+       repository by walking up from *file* -- died at load. Zero tests ran.
+    2. The runner named its three test files as literal paths. The 2026-09-10
+       rename to .kotoba moved the files and did not touch the list, so the
+       runner died on the first name. Zero tests ran. The same rename also took
+       reader conditionals away, because load-file grants them from the file
+       NAME (Compiler.readerOpts allows them only for \".cljc\"), so even a
+       corrected path could not be read.
+
+  Both are the same defect: the set of test files was written down in a second
+  place, and the two places drifted. So this test asks the runner what it would
+  load -- by running it with --print-plan -- and compares that against a walk of
+  test/ done here, independently. The two have to agree, and neither side is
+  computed from the other."
+  (:require [clojure.test :refer [deftest is]]
+            [clojure.java.io :as io]
+            [clojure.string :as str])
+  (:import [java.io File PushbackReader]))
+
+(defn- source? [^File f]
+  (and (.isFile f)
+       (boolean (re-find #"\.(?:kotoba|cljc|cljs|clj)$" (.getName f)))))
+
+(defn- ns-of [^File f]
+  (with-open [r (PushbackReader. (io/reader f))]
+    (let [form (read {:read-cond :allow} r)]
+      (when (and (seq? form) (= 'ns (first form)))
+        (str (second form))))))
+
+(defn- on-disk-plan []
+  (into (sorted-map)
+        (for [^File f (file-seq (io/file "test")) :when (source? f)]
+          [(.getPath f) (ns-of f)])))
+
+(defn- runner-plan
+  "Runs the runner with --print-plan, which prints and loads nothing."
+  []
+  (let [pb (doto (ProcessBuilder. ["clojure" "-M" "run_tests.kotoba" "--print-plan"])
+             (.redirectErrorStream true))
+        p  (.start pb)
+        out (slurp (.getInputStream p))
+        code (.waitFor p)
+        lines (->> (str/split-lines out) (map str/trim) (remove str/blank?))
+        counted (some #(when-let [m (re-matches #"PLANNED (\d+)" %)]
+                         (Long/parseLong (second m)))
+                      lines)]
+    {:exit code
+     :out out
+     :counted counted
+     :plan (into (sorted-map)
+                 (for [l lines
+                       :let [[path ns-sym] (str/split l #"\s+" 2)]
+                       :when (and ns-sym (str/starts-with? path "test"))]
+                   [path ns-sym]))}))
+
+(deftest runner-plan-is-every-test-file-on-disk
+  (let [disk (on-disk-plan)
+        {:keys [exit counted plan out]} (runner-plan)]
+    ;; A plan that could not be measured must not read as a plan that matched.
+    (is (zero? exit) (str "run_tests.kotoba --print-plan exited " exit ": " out))
+    (is (some? counted) (str "--print-plan printed no PLANNED count: " out))
+    ;; Evidence floor: an empty walk agrees with an empty plan, and that
+    ;; agreement is worth nothing.
+    (is (<= 3 (count disk))
+        (str "expected at least the three original test files on disk, walked " (count disk)))
+    (is (= (count plan) counted)
+        "the runner's own PLANNED count must match the lines it printed")
+    (is (empty? (remove (comp (set (keys disk)) key) plan))
+        (str "the runner plans files that are not on disk: "
+             (pr-str (remove (comp (set (keys disk)) key) plan))))
+    (is (empty? (remove (comp (set (keys plan)) key) disk))
+        (str "test files on disk that the runner does not load: "
+             (pr-str (remove (comp (set (keys plan)) key) disk))))
+    (is (= disk plan) "every path must map to the namespace its own ns form declares")))
+
+(defn- probe-file
+  "The same two forms written out under a given extension, in a temp directory."
+  [ext]
+  (let [dir (java.nio.file.Files/createTempDirectory
+             "tsukuroi-loader-probe" (make-array java.nio.file.attribute.FileAttribute 0))
+        f   (io/file (.toFile dir) (str "probe" ext))]
+    (spit f "(ns tsukuroi.loader-probe)\n(def probed #?(:clj :clj :default :other))\n")
+    f))
+
+(defn- load-file-refusal
+  "nil if load-file accepted the file, otherwise the ROOT cause's message.
+   The reason is pinned as a literal: Clojure wraps it in a CompilerException
+   whose own message is the generic \"Syntax error reading source at ...\", and
+   asserting on the wrapper would pass for any read error at all."
+  [^File f]
+  (try (load-file (.getPath f)) nil
+       (catch Throwable t
+         (loop [t t] (if-let [c (.getCause t)] (recur c) (.getMessage t))))))
+
+(deftest reader-conditionals-are-granted-by-the-file-name-not-the-content
+  ;; Why the runner reads its files itself instead of calling load-file, and
+  ;; why the 2026-09-10 rename could not be repaired by correcting the paths
+  ;; alone. Clojure's loader decides whether #?(...) is legal from the file
+  ;; NAME -- Compiler.readerOpts allows it only for ".cljc" -- so identical
+  ;; bytes load under one extension and are refused under another.
+  (let [as-cljc   (probe-file ".cljc")
+        as-kotoba (probe-file ".kotoba")]
+    (is (nil? (load-file-refusal as-cljc))
+        "the same bytes named .cljc load, so the probe is a valid file")
+    (is (= :clj @(resolve 'tsukuroi.loader-probe/probed))
+        "and they really did load: the :clj branch was taken")
+    (is (= "Conditional read not allowed" (load-file-refusal as-kotoba))
+        "named .kotoba they are refused -- the extension, not the content, grants it")
+    ;; What the runner does instead, on the same bytes it could not load.
+    (is (= 2 (with-open [r (PushbackReader. (io/reader as-kotoba))]
+               (loop [n 0] (let [f (read {:read-cond :allow :eof ::eof} r)]
+                             (if (identical? ::eof f) n (recur (inc n)))))))
+        "reading with :read-cond :allow is what makes the name stop mattering")))
