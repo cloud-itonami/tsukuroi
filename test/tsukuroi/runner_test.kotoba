@@ -41,7 +41,7 @@
 (defn- runner-plan
   "Runs the runner with --print-plan, which prints and loads nothing."
   []
-  (let [pb (doto (ProcessBuilder. ["clojure" "-M" "run_tests.kotoba" "--print-plan"])
+  (let [pb (doto (ProcessBuilder. ["kbb" "-M" "run_tests.kotoba" "--print-plan"])
              (.redirectErrorStream true))
         p  (.start pb)
         out (slurp (.getInputStream p))
