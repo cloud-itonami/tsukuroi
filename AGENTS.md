@@ -1,4 +1,4 @@
-# orgs/etzhayyim/com-etzhayyim-tsukuroi — CLAUDE.md
+# orgs/etzhayyim/com-etzhayyim-tsukuroi — AGENTS.md
 
 ## Identity
 
@@ -108,4 +108,4 @@ akuma.finding (VulnFinding)
 - `/90-docs/adr/2605215000-etzhayyim-inference-murakumo-only-no-runpod.md` — Murakumo-only
 - `/90-docs/adr/2605262130-kotoba-storage-substrate-unification.md` — storage substrate
 - `/90-docs/adr/2605262700-chigiri-legal-procedure-tier-b-actor-r0.md` — dispute mediation sink
-- `/CHARTER-RIDER.md` · `/COUNCIL.md` · `/CLAUDE.md`
+- `/CHARTER-RIDER.md` · `/COUNCIL.md` · `/AGENTS.md`
